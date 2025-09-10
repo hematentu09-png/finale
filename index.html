@@ -3,147 +3,160 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>360° Model Viewer Dashboard</title>
+  <title>360° Viewer Dashboard</title>
   <style>
-    * {
-      box-sizing: border-box;
-    }
-
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
+      background: #f5f5f5;
+      color: #333;
     }
 
     header {
-      background: #2c3e50;
+      background-color: #1e1e2f;
       color: white;
-      padding: 1em 2em;
+      padding: 1rem;
       text-align: center;
     }
 
-    .dashboard {
+    .container {
       display: flex;
-      flex-direction: row;
-      padding: 2em;
-      gap: 2em;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 30px;
     }
 
-    .viewer {
-      flex: 2;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      padding: 1em;
-      text-align: center;
-    }
-
-    #modelFrame {
-      width: 100%;
-      max-width: 600px;
-      height: auto;
+    #viewer {
+      width: 600px;
+      height: 400px;
+      background-color: #ddd;
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      border: 1px solid #ccc;
       cursor: grab;
+      user-select: none;
     }
 
-    .info-panel {
-      flex: 1;
-      background: white;
-      padding: 1em;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    .controls {
+      margin-top: 20px;
+      display: flex;
+      gap: 15px;
     }
 
-    h2 {
-      margin-top: 0;
+    .controls button {
+      padding: 10px 20px;
+      border: none;
+      background-color: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
     }
 
-    .footer {
+    .controls button:hover {
+      background-color: #0056b3;
+    }
+
+    footer {
+      margin-top: 40px;
       text-align: center;
-      padding: 1em;
-      color: #888;
-      font-size: 0.9em;
+      padding: 1rem;
+      background: #1e1e2f;
+      color: white;
     }
   </style>
 </head>
 <body>
-
   <header>
-    <h1>360° Model Viewer Dashboard</h1>
+    <h1>360° Product Viewer Dashboard</h1>
   </header>
 
-  <div class="dashboard">
-    <!-- Model Viewer -->
-    <div class="viewer">
-      <h2>360° Model View</h2>
-      <img id="modelFrame" src="frames/model_001.jpg" alt="360-degree model view" />
-      <p>Drag left or right to rotate</p>
-    </div>
-
-    <!-- Information Panel -->
-    <div class="info-panel">
-      <h2>Model Information</h2>
-      <p><strong>Name:</strong> Sample Product Model</p>
-      <p><strong>Description:</strong> This is a 3D turntable view of a sample product. The model can be rotated by dragging horizontally across the viewer. Each frame represents a 10° turn, totaling 36 frames.</p>
-      <p><strong>Use Case:</strong> Product showcase, architecture previews, educational models, etc.</p>
+  <div class="container">
+    <div id="viewer"></div>
+    <div class="controls">
+      <button onclick="startAutoRotate()">Start Auto-Rotate</button>
+      <button onclick="stopAutoRotate()">Stop</button>
+      <button onclick="resetView()">Reset</button>
     </div>
   </div>
 
-  <div class="footer">
-    &copy; 2025 360View Inc. All rights reserved.
-  </div>
+  <footer>
+    &copy; 2025 Your Company Name — 360° Viewer
+  </footer>
 
   <script>
-    const frameCount = 36;
-    const imageElement = document.getElementById("modelFrame");
-    let currentFrame = 1;
+    const viewer = document.getElementById('viewer');
+    const totalFrames = 36; // Number of images
+    let currentFrame = 0;
     let isDragging = false;
-    let startX;
+    let startX = 0;
+    let autoRotateInterval = null;
 
-    function getFramePath(index) {
-      return `frames/model_${String(index).padStart(3, '0')}.jpg`;
+    // Preload images
+    const images = [];
+    for (let i = 1; i <= totalFrames; i++) {
+      const img = new Image();
+      const padded = String(i).padStart(3, '0');
+      img.src = `images/img${padded}.jpg`; // Path to images
+      images.push(img);
     }
 
-    function updateImage(frame) {
-      imageElement.src = getFramePath(frame);
+    function updateFrame(frame) {
+      const padded = String(frame + 1).padStart(3, '0');
+      viewer.style.backgroundImage = `url('images/img${padded}.jpg')`;
     }
 
-    imageElement.addEventListener("mousedown", (e) => {
+    function startAutoRotate() {
+      if (autoRotateInterval) return;
+      autoRotateInterval = setInterval(() => {
+        currentFrame = (currentFrame + 1) % totalFrames;
+        updateFrame(currentFrame);
+      }, 100);
+    }
+
+    function stopAutoRotate() {
+      clearInterval(autoRotateInterval);
+      autoRotateInterval = null;
+    }
+
+    function resetView() {
+      currentFrame = 0;
+      updateFrame(currentFrame);
+      stopAutoRotate();
+    }
+
+    viewer.addEventListener('mousedown', (e) => {
       isDragging = true;
       startX = e.clientX;
-      imageElement.style.cursor = "grabbing";
+      viewer.style.cursor = 'grabbing';
     });
 
-    window.addEventListener("mouseup", () => {
+    viewer.addEventListener('mouseup', () => {
       isDragging = false;
-      imageElement.style.cursor = "grab";
+      viewer.style.cursor = 'grab';
     });
 
-    window.addEventListener("mousemove", (e) => {
+    viewer.addEventListener('mouseleave', () => {
+      isDragging = false;
+      viewer.style.cursor = 'grab';
+    });
+
+    viewer.addEventListener('mousemove', (e) => {
       if (!isDragging) return;
-
-      const delta = e.clientX - startX;
-
-      if (Math.abs(delta) > 5) {
-        if (delta > 0) {
-          currentFrame = (currentFrame - 1 + frameCount) % frameCount || frameCount;
+      const deltaX = e.clientX - startX;
+      if (Math.abs(deltaX) > 5) {
+        if (deltaX > 0) {
+          currentFrame = (currentFrame - 1 + totalFrames) % totalFrames;
         } else {
-          currentFrame = (currentFrame + 1 - 1) % frameCount + 1;
+          currentFrame = (currentFrame + 1) % totalFrames;
         }
-        updateImage(currentFrame);
+        updateFrame(currentFrame);
         startX = e.clientX;
       }
     });
 
-    // Preload images
-    function preloadImages() {
-      for (let i = 1; i <= frameCount; i++) {
-        const img = new Image();
-        img.src = getFramePath(i);
-      }
-    }
-
-    preloadImages();
+    // Initial frame
+    updateFrame(currentFrame);
   </script>
-
 </body>
 </html>
