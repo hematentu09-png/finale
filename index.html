@@ -1,149 +1,78 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>360° Model Viewer Dashboard</title>
-  <style>
-    * {
-      box-sizing: border-box;
-    }
+<!doctype html>
+scene.add(root);
+current.scene = root;
+current.url = meta.url; current.name = meta.name;
+const info = countFacesAndMats(root);
+specName.textContent = meta.name; specFaces.textContent = info.faces; specMats.textContent = info.mats.join(', ') || '—';
+fitToObject(root);
+},xhr=>{},err=>{
+console.error('Failed to load model',err); specUrl.textContent = 'Failed to load — check URL & CORS';
+// fallback
+const placeholder = makePlaceholder(); scene.add(placeholder); current.scene = placeholder; specName.textContent = meta.name; specFaces.textContent = '—'; specMats.textContent = '—';
+});
+} else {
+specUrl.textContent = 'No URL (placeholder)';
+const placeholder = makePlaceholder(); scene.add(placeholder); current.scene = placeholder; current.url = null; current.name = meta.name;
+specName.textContent = meta.name; specFaces.textContent = '—'; specMats.textContent = '—';
+fitToObject(placeholder);
+}
+}
 
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background-color: #f4f4f4;
-    }
 
-    header {
-      background: #2c3e50;
-      color: white;
-      padding: 1em 2em;
-      text-align: center;
-    }
+// fit object to camera view
+function fitToObject(obj){
+const box = new THREE.Box3().setFromObject(obj);
+const size = box.getSize(new THREE.Vector3());
+const center = box.getCenter(new THREE.Vector3());
+const maxDim = Math.max(size.x,size.y,size.z);
+const fov = camera.fov * (Math.PI/180);
+let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov/2));
+cameraZ *= 1.5; // zoom out a bit
+camera.position.set(center.x + cameraZ*0.2, center.y + cameraZ*0.2, center.z + cameraZ);
+camera.lookAt(center);
+controls.target.copy(center);
+controls.update();
+}
 
-    .dashboard {
-      display: flex;
-      flex-direction: row;
-      padding: 2em;
-      gap: 2em;
-    }
 
-    .viewer {
-      flex: 2;
-      background: white;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      padding: 1em;
-      text-align: center;
-    }
+// UI actions
+colorPicker.addEventListener('input', (e)=>{applyColor(e.target.value)});
+fitBtn.addEventListener('click', ()=>{ if(current.scene) fitToObject(current.scene); });
+toggleGridBtn.addEventListener('click', ()=>{ grid.visible = !grid.visible; });
+wireBtn.addEventListener('click', ()=>{
+if(!current.scene) return; current.scene.traverse(node=>{if(node.isMesh){ if(node.material){ node.material.wireframe = !node.material.wireframe }}});
+});
 
-    #modelFrame {
-      width: 100%;
-      max-width: 600px;
-      height: auto;
-      cursor: grab;
-    }
 
-    .info-panel {
-      flex: 1;
-      background: white;
-      padding: 1em;
-      border-radius: 8px;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-    }
+downloadBtn.addEventListener('click', ()=>{
+if(current.url){ window.open(current.url, '_blank'); } else alert('No downloadable URL for the current model. Provide a hosted .glb URL in the models array.');
+});
 
-    h2 {
-      margin-top: 0;
-    }
 
-    .footer {
-      text-align: center;
-      padding: 1em;
-      color: #888;
-      font-size: 0.9em;
-    }
-  </style>
-</head>
-<body>
+screenshotBtn.addEventListener('click', ()=>{
+const data = renderer.domElement.toDataURL('image/png');
+const a = document.createElement('a'); a.href = data; a.download = `${(current.name||'model')}.png`; a.click();
+});
 
-  <header>
-    <h1>360° Model Viewer Dashboard</h1>
-  </header>
 
-  <div class="dashboard">
-    <!-- Model Viewer -->
-    <div class="viewer">
-      <h2>360° Model View</h2>
-      <img id="modelFrame" src="frames/model_001.jpg" alt="360-degree model view" />
-      <p>Drag left or right to rotate</p>
-    </div>
+// render loop
+function onWindowResize(){
+const w = wrap.clientWidth; const h = wrap.clientHeight; camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
+}
+window.addEventListener('resize', onWindowResize);
 
-    <!-- Information Panel -->
-    <div class="info-panel">
-      <h2>Model Information</h2>
-      <p><strong>Name:</strong> Sample Product Model</p>
-      <p><strong>Description:</strong> This is a 3D turntable view of a sample product. The model can be rotated by dragging horizontally across the viewer. Each frame represents a 10° turn, totaling 36 frames.</p>
-      <p><strong>Use Case:</strong> Product showcase, architecture previews, educational models, etc.</p>
-    </div>
-  </div>
 
-  <div class="footer">
-    &copy; 2025 360View Inc. All rights reserved.
-  </div>
+function animate(){ requestAnimationFrame(animate); controls.update(); renderer.render(scene,camera); }
+animate();
 
-  <script>
-    const frameCount = 36;
-    const imageElement = document.getElementById("modelFrame");
-    let currentFrame = 1;
-    let isDragging = false;
-    let startX;
 
-    function getFramePath(index) {
-      return `frames/model_${String(index).padStart(3, '0')}.jpg`;
-    }
+// initialize list and select first
+buildList();
+loadModelIndex(0);
 
-    function updateImage(frame) {
-      imageElement.src = getFramePath(frame);
-    }
 
-    imageElement.addEventListener("mousedown", (e) => {
-      isDragging = true;
-      startX = e.clientX;
-      imageElement.style.cursor = "grabbing";
-    });
-
-    window.addEventListener("mouseup", () => {
-      isDragging = false;
-      imageElement.style.cursor = "grab";
-    });
-
-    window.addEventListener("mousemove", (e) => {
-      if (!isDragging) return;
-
-      const delta = e.clientX - startX;
-
-      if (Math.abs(delta) > 5) {
-        if (delta > 0) {
-          currentFrame = (currentFrame - 1 + frameCount) % frameCount || frameCount;
-        } else {
-          currentFrame = (currentFrame + 1 - 1) % frameCount + 1;
-        }
-        updateImage(currentFrame);
-        startX = e.clientX;
-      }
-    });
-
-    // Preload images
-    function preloadImages() {
-      for (let i = 1; i <= frameCount; i++) {
-        const img = new Image();
-        img.src = getFramePath(i);
-      }
-    }
-
-    preloadImages();
-  </script>
-
+// Small helpful note to user (console)
+console.log('3D Car Models Dashboard ready. Replace models[] URLs with your .glb links. When previewing locally, run a local server to avoid CORS issues (e.g. python -m http.server).');
+</script>
 </body>
 </html>
